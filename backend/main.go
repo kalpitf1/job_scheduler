@@ -17,7 +17,8 @@ type Job struct {
 	Name     string        `json:"name"`
 	Duration time.Duration `json:"duration"`
 	Status   string        `json:"status"`
-	Index    int           `json:"-"` // Index in the heap
+	Index    int           `json:"-"`  // Index in the heap
+	ID       int           `json:"id"` // Unique identifier for the job
 }
 
 // JobPriorityQueue implements heap.Interface and holds Jobs
@@ -59,17 +60,19 @@ func (pq *JobPriorityQueue) Peek() *Job {
 }
 
 var (
-	jobs          JobPriorityQueue
-	completedJobs []Job
-	jobsMutex     sync.Mutex
-	processing    bool
-	processingM   sync.Mutex
+	jobs        []*Job
+	jobsMutex   sync.Mutex
+	jobCounter  int
+	pq          JobPriorityQueue
+	pqMutex     sync.Mutex
+	processing  bool
+	processingM sync.Mutex
 )
 
 func main() {
 	log.Println("Starting Backend")
 
-	heap.Init(&jobs)
+	heap.Init(&pq)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/jobs", getJobs).Methods("GET")
@@ -82,30 +85,15 @@ func main() {
 		handlers.AllowedHeaders([]string{"Content-Type"}),
 	)
 
-	go processJobs()
-
 	log.Fatal(http.ListenAndServe(":8080", cors(r)))
 }
 
-// getJobs - Updated to return both pending and completed jobs
 func getJobs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	jobsMutex.Lock()
 	defer jobsMutex.Unlock()
 
-	// Combine pending and completed jobs
-	jobsList := make([]Job, len(jobs)+len(completedJobs))
-	for i, job := range jobs {
-		jobsList[i] = *job
-	}
-	for i, job := range completedJobs {
-		jobsList[len(jobs)+i] = job
-	}
-
-	if len(jobsList) == 0 {
-		log.Println("No jobs available")
-	}
-	err := json.NewEncoder(w).Encode(jobsList)
+	err := json.NewEncoder(w).Encode(jobs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -124,8 +112,13 @@ func createJob(w http.ResponseWriter, r *http.Request) {
 	newJob.Status = "Pending"
 
 	jobsMutex.Lock()
-	heap.Push(&jobs, &newJob)
+	jobCounter++
+	jobs = append(jobs, &newJob)
 	jobsMutex.Unlock()
+
+	pqMutex.Lock()
+	heap.Push(&pq, &newJob)
+	pqMutex.Unlock()
 
 	// Wake up the processing goroutine if it's idle
 	processingM.Lock()
@@ -143,28 +136,28 @@ func createJob(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// processJobs - Updated to move completed jobs to a separate list
 func processJobs() {
 	for {
-		jobsMutex.Lock()
-		if jobs.Len() == 0 {
-			jobsMutex.Unlock()
+		pqMutex.Lock()
+		if pq.Len() == 0 {
+			pqMutex.Unlock()
 			processingM.Lock()
 			processing = false
 			processingM.Unlock()
 			return
 		}
 
-		job := heap.Pop(&jobs).(*Job)
-		jobsMutex.Unlock()
+		job := heap.Pop(&pq).(*Job)
+		pqMutex.Unlock()
 
+		jobsMutex.Lock()
 		job.Status = "In Progress"
+		jobsMutex.Unlock()
 		log.Printf("Processing job: %+v\n", job)
 		time.Sleep(job.Duration)
 
-		job.Status = "Completed"
 		jobsMutex.Lock()
-		completedJobs = append(completedJobs, *job)
+		job.Status = "Completed"
 		jobsMutex.Unlock()
 		log.Printf("Completed job: %+v\n", job)
 	}
