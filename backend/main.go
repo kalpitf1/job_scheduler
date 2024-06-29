@@ -138,6 +138,7 @@ func createJob(w http.ResponseWriter, r *http.Request) {
 	// Wake up the processing goroutine if it's idle
 	processingM.Lock()
 	if !processing {
+		processing = true
 		processingM.Unlock()
 		go processJobs()
 	} else {
