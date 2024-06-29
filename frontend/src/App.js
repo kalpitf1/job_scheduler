@@ -14,7 +14,9 @@ const App = () => {
   const fetchJobs = async () => {
     try {
       const response = await axios.get('http://localhost:8080/jobs');
-      setJobs(response.data);
+      if (response.data) {
+        setJobs(response.data);
+      }
     } catch (error) {
       console.error('Error fetching jobs:', error);
     }
@@ -60,13 +62,17 @@ const App = () => {
       </div>
       <div>
         <h2>Jobs List</h2>
-        <ul>
-          {jobs.map((job, index) => (
-            <li key={index}>
-              {job.name} - {job.duration} - {job.status}
-            </li>
-          ))}
-        </ul>
+        {jobs.length === 0 ? (
+          <p>No jobs available</p>
+        ) : (
+          <ul>
+            {jobs.map((job, index) => (
+              <li key={index}>
+                {job.name} - {job.duration} - {job.status}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
