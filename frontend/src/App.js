@@ -5,10 +5,30 @@ const App = () => {
   const [jobs, setJobs] = useState([]);
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('');
-  const [status, setStatus] = useState('');
 
   useEffect(() => {
     fetchJobs();
+    const ws = new WebSocket('ws://localhost:8080/ws');
+
+    ws.onmessage = (event) => {
+      const updatedJob = JSON.parse(event.data);
+      setJobs((prevJobs) => {
+        const jobIndex = prevJobs.findIndex(job => job.id === updatedJob.id);
+        if (jobIndex !== -1) {
+          const newJobs = [...prevJobs];
+          newJobs[jobIndex] = updatedJob;
+          return newJobs;
+        } else {
+          return [...prevJobs, updatedJob];
+        }
+      });
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+
+    return () => ws.close();
   }, []);
 
   const fetchJobs = async () => {
@@ -23,13 +43,12 @@ const App = () => {
   };
 
   const addJob = async () => {
-    const newJob = { name, duration: parseInt(duration) * Math.pow(10, 9), status };  // server accepts time in nanoseconds
+    const newJob = { name, duration: parseInt(duration) * Math.pow(10, 9) };  // server accepts time in nanoseconds
     try {
       const response = await axios.post('http://localhost:8080/jobs', newJob);
       setJobs([...jobs, response.data]);
       setName('');
       setDuration('');
-      setStatus('');
     } catch (error) {
       console.error('Error adding job:', error);
     }

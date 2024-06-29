@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 )
 
 // Job represents data about a posted job
@@ -67,6 +68,14 @@ var (
 	pqMutex     sync.Mutex
 	processing  bool
 	processingM sync.Mutex
+
+	clients   = make(map[*websocket.Conn]bool)
+	broadcast = make(chan *Job)
+	upgrader  = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 )
 
 func main() {
@@ -77,6 +86,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/jobs", getJobs).Methods("GET")
 	r.HandleFunc("/jobs", createJob).Methods("POST")
+	r.HandleFunc("/ws", handleConnections)
 
 	// Apply CORS headers to the router
 	cors := handlers.CORS(
@@ -84,6 +94,8 @@ func main() {
 		handlers.AllowedMethods([]string{"GET", "POST"}),
 		handlers.AllowedHeaders([]string{"Content-Type"}),
 	)
+
+	go handleMessages()
 
 	log.Fatal(http.ListenAndServe(":8080", cors(r)))
 }
@@ -110,6 +122,7 @@ func createJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newJob.Status = "Pending"
+	newJob.ID = jobCounter
 
 	jobsMutex.Lock()
 	jobCounter++
@@ -119,6 +132,8 @@ func createJob(w http.ResponseWriter, r *http.Request) {
 	pqMutex.Lock()
 	heap.Push(&pq, &newJob)
 	pqMutex.Unlock()
+
+	broadcast <- &newJob
 
 	// Wake up the processing goroutine if it's idle
 	processingM.Lock()
@@ -154,11 +169,51 @@ func processJobs() {
 		job.Status = "In Progress"
 		jobsMutex.Unlock()
 		log.Printf("Processing job: %+v\n", job)
+
+		broadcast <- job
+
 		time.Sleep(job.Duration)
 
 		jobsMutex.Lock()
 		job.Status = "Completed"
 		jobsMutex.Unlock()
 		log.Printf("Completed job: %+v\n", job)
+
+		broadcast <- job
+	}
+}
+
+func handleConnections(w http.ResponseWriter, r *http.Request) {
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ws.Close()
+
+	clients[ws] = true
+
+	for {
+		var msg Job
+		err := ws.ReadJSON(&msg)
+		if err != nil {
+			log.Printf("error: %v", err)
+			delete(clients, ws)
+			break
+		}
+	}
+}
+
+func handleMessages() {
+	for {
+		job := <-broadcast
+
+		for client := range clients {
+			err := client.WriteJSON(job)
+			if err != nil {
+				log.Printf("error: %v", err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
 	}
 }
