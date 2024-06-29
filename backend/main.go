@@ -27,7 +27,11 @@ func main() {
 	r.HandleFunc("/jobs", createJob).Methods("POST")
 
 	// Apply CORS headers to the router
-	cors := handlers.CORS(handlers.AllowedOrigins([]string{"*"}), handlers.AllowedMethods([]string{"GET", "POST"}))
+	cors := handlers.CORS(
+		handlers.AllowedOrigins([]string{"http://localhost:3000"}), // Allow requests from your React app
+		handlers.AllowedMethods([]string{"GET", "POST"}),
+		handlers.AllowedHeaders([]string{"Content-Type"}),
+	)
 
 	log.Fatal(http.ListenAndServe(":8080", cors(r)))
 }

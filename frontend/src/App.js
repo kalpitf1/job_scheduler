@@ -23,7 +23,7 @@ const App = () => {
   };
 
   const addJob = async () => {
-    const newJob = { name, duration, status };
+    const newJob = { name, duration: parseInt(duration) * Math.pow(10, 9), status };  // server accepts time in nanoseconds
     try {
       const response = await axios.post('http://localhost:8080/jobs', newJob);
       setJobs([...jobs, response.data]);
@@ -68,7 +68,7 @@ const App = () => {
           <ul>
             {jobs.map((job, index) => (
               <li key={index}>
-                {job.name} - {job.duration} - {job.status}
+                {job.name} - {job.duration / Math.pow(10, 9)} - {job.status}  {/* server returns time in nanoseconds */}
               </li>
             ))}
           </ul>
