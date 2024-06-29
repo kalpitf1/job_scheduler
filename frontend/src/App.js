@@ -52,12 +52,6 @@ const App = () => {
           value={duration}
           onChange={(e) => setDuration(e.target.value)}
         />
-        <input
-          type="text"
-          placeholder="Status"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-        />
         <button onClick={addJob}>Add Job</button>
       </div>
       <div>
