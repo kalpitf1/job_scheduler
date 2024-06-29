@@ -59,10 +59,11 @@ func (pq *JobPriorityQueue) Peek() *Job {
 }
 
 var (
-	jobs        JobPriorityQueue
-	jobsMutex   sync.Mutex
-	processing  bool
-	processingM sync.Mutex
+	jobs          JobPriorityQueue
+	completedJobs []Job
+	jobsMutex     sync.Mutex
+	processing    bool
+	processingM   sync.Mutex
 )
 
 func main() {
@@ -86,15 +87,19 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", cors(r)))
 }
 
+// getJobs - Updated to return both pending and completed jobs
 func getJobs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	jobsMutex.Lock()
 	defer jobsMutex.Unlock()
 
-	log.Println("Fetching jobs")
-	jobsList := make([]Job, len(jobs))
+	// Combine pending and completed jobs
+	jobsList := make([]Job, len(jobs)+len(completedJobs))
 	for i, job := range jobs {
 		jobsList[i] = *job
+	}
+	for i, job := range completedJobs {
+		jobsList[len(jobs)+i] = job
 	}
 
 	if len(jobsList) == 0 {
@@ -116,7 +121,6 @@ func createJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// newJob.Duration = newJob.Duration * time.Second
 	newJob.Status = "Pending"
 
 	jobsMutex.Lock()
@@ -139,6 +143,7 @@ func createJob(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// processJobs - Updated to move completed jobs to a separate list
 func processJobs() {
 	for {
 		jobsMutex.Lock()
@@ -158,6 +163,9 @@ func processJobs() {
 		time.Sleep(job.Duration)
 
 		job.Status = "Completed"
+		jobsMutex.Lock()
+		completedJobs = append(completedJobs, *job)
+		jobsMutex.Unlock()
 		log.Printf("Completed job: %+v\n", job)
 	}
 }
