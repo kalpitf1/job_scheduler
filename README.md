@@ -12,7 +12,9 @@ For the client,
 - `npm install`
 - `npm start`
 
-Open `http://localhost:3000/`
+Open `http://localhost:3000/`, add a few jobs, and it should look as follows:
+
+![Screen Shot 2024-07-01 at 2 40 04 PM](https://github.com/kalpitf1/job_scheduler/assets/37945736/8ed492e5-f110-4e17-98ee-c881d0967609)
 
 ## Design choices
 - Used priority queue + sync.Mutex to implement SJF algorithm for executing the highest priority (shortest duration) job as a blocking task
