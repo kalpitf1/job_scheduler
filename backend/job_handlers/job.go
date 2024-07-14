@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	jobs        []*models.Job
-	jobsMutex   sync.Mutex
+	Jobs        []*models.Job
+	JobsMutex   sync.Mutex
 	jobCounter  int
 	pq          utils.JobPriorityQueue
 	pqMutex     sync.Mutex
@@ -29,10 +29,10 @@ func init() {
 
 func GetJobs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	jobsMutex.Lock()
-	defer jobsMutex.Unlock()
+	JobsMutex.Lock()
+	defer JobsMutex.Unlock()
 
-	err := json.NewEncoder(w).Encode(jobs)
+	err := json.NewEncoder(w).Encode(Jobs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -51,10 +51,10 @@ func CreateJob(w http.ResponseWriter, r *http.Request) {
 	newJob.Status = "Pending"
 	newJob.ID = jobCounter
 
-	jobsMutex.Lock()
+	JobsMutex.Lock()
 	jobCounter++
-	jobs = append(jobs, &newJob)
-	jobsMutex.Unlock()
+	Jobs = append(Jobs, &newJob)
+	JobsMutex.Unlock()
 
 	pqMutex.Lock()
 	heap.Push(&pq, &newJob)
@@ -93,18 +93,18 @@ func processJobs() {
 		job := heap.Pop(&pq).(*models.Job)
 		pqMutex.Unlock()
 
-		jobsMutex.Lock()
+		JobsMutex.Lock()
 		job.Status = "In Progress"
-		jobsMutex.Unlock()
+		JobsMutex.Unlock()
 		log.Printf("Processing job: %+v\n", job)
 
 		websocket.Broadcast <- job
 
 		time.Sleep(job.Duration)
 
-		jobsMutex.Lock()
+		JobsMutex.Lock()
 		job.Status = "Completed"
-		jobsMutex.Unlock()
+		JobsMutex.Unlock()
 		log.Printf("Completed job: %+v\n", job)
 
 		websocket.Broadcast <- job
