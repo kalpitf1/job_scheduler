@@ -133,6 +133,9 @@ func TestCreateJob(t *testing.T) {
 		if status := w.Code; status != http.StatusOK {
 			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 		}
+		if len(job_handlers.Jobs) != 1 {
+			t.Errorf("newJob not added to Jobs array")
+		}
 		done <- true
 	}()
 
@@ -242,6 +245,9 @@ func BenchmarkCreateJob(b *testing.B) {
 		// Check the status code.
 		if status := w.Code; status != http.StatusOK {
 			b.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+		if len(job_handlers.Jobs) != 1 {
+			b.Errorf("newJob not added to Jobs array")
 		}
 	}
 }
