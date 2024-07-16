@@ -150,9 +150,9 @@ func processJobs() {
 
 			select {
 			case websocket.Broadcast <- job:
-				log.Println("CreateJob: Broadcast successful")
+				log.Println("processJobs: In Progress Broadcast successful")
 			default:
-				log.Println("CreateJob: Broadcast channel is full, skipping broadcast")
+				log.Println("processJobs: In Progress Broadcast channel is full, skipping broadcast")
 			}
 		}
 		BroadcastEnabledMutex.Unlock()
@@ -176,9 +176,9 @@ func processJobs() {
 
 			select {
 			case websocket.Broadcast <- job:
-				log.Println("CreateJob: Broadcast successful")
+				log.Println("processJobs: Completed Broadcast successful")
 			default:
-				log.Println("CreateJob: Broadcast channel is full, skipping broadcast")
+				log.Println("processJobs: Completed Broadcast channel is full, skipping broadcast")
 			}
 		}
 		BroadcastEnabledMutex.Unlock()
